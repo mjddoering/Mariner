@@ -73,7 +73,7 @@ for FILE in $PROJECTDIR1/$ASSEMBLYDIR/*.fa; do
 	K=$(cut -d "_" -f 2 <<< "$OUTFILE" | cut -d "k" -f 2)
 	reformat.sh in=$FILE out=$PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.$MINLEN.fa minlength=$MINLEN
 	cat $PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.$MINLEN.fa | \
-		. $SCRIPTS/firmament.sh -i - \
+		firmament.sh -i - \
 		-o $PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.fa \
 		-s $SPECIES -d $D \
 		-a $A -n $N -k $K
