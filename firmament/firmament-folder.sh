@@ -46,17 +46,13 @@ case $options in
 	?) printERR;;
 esac; done
 
-if [[ $INPUT == "" ]]; then
-	printUsage;
- 	kill -INT $$
-fi
 if [[ $MINLEN == "" ]]; then
-	$MINLEN=150
+	MINLEN=150;
 fi
 
-SCRIPTS="$HOME/scripts"
 PROJECTDIR1=$(rev <<< "$PROJECTDIR" | cut -d "/" -f 2- | cut -d "." -f 2- | rev)
 ASSEMBLYDIR=$(rev <<< "$PROJECTDIR" | cut -d "/" -f 1 | cut -d "." -f 1 | rev)
+OUTDIR="firmament"
 mkdir -p $PROJECTDIR1/$OUTDIR/tmp
 #for file in directory of format: assembler_[n]pk[1-9][1-9][1-9]
 for FILE in $PROJECTDIR1/$ASSEMBLYDIR/*.fa; do
@@ -74,8 +70,8 @@ for FILE in $PROJECTDIR1/$ASSEMBLYDIR/*.fa; do
 	reformat.sh in=$FILE out=$PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.$MINLEN.fa minlength=$MINLEN
 	cat $PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.$MINLEN.fa | \
 		firmament.sh -i - \
-		-o $PROJECTDIR1/$OUTDIR/tmp/$OUTFILE.fa \
-		-s $SPECIES -d $D \
+		-o $PROJECTDIR1/$OUTDIR/$OUTFILE.fa \
+		-s $SPECIES -d $DESC \
 		-a $A -n $N -k $K
 done
 
