@@ -35,7 +35,7 @@ printUsage () {
 	echo -e "\tExample: $SCRIPTLOC -h\v"
 }
 
-while getopts :s:d:p:hv options; do
+while getopts :s:d:p:m:hv options; do
 case $options in
 	s) SPECIES=${OPTARG};;
 	d) DESC=${OPTARG};;
