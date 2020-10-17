@@ -156,7 +156,7 @@ if [[ $INPUT == "-" ]]; then
 else
 	if [[ $OUTFILE == "" ]]; then
 		OUTFILE=$(rev <<< "$INPUT" | cut -d "." -f 2- | rev)
-		OUT1="$OUTFILE"h.fa
+		OUT1="$OUTFILE"m.fa
 		OUTFILE=$OUT1
 	fi
 fi
