@@ -355,4 +355,4 @@ ENV PATH $INSTALLPATH/Mariner-0.2:$PATH
 ENV PATH $INSTALLPATH/Mariner-0.2/firmament:$PATH
 ENV PATH $INSTALLPATH/Mariner-0.2/sextant:$PATH
 WORKDIR /home/mariner
-#USER vega
+#USER vega 
