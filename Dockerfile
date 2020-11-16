@@ -162,7 +162,7 @@ ENV PATH $INSTALLPATH/evigene/scripts/prot:$PATH
 ENV PATH $INSTALLPATH/evigene/scripts/rnaseq:$PATH
 RUN cd $INSTALLPATH && \
         wget http://ftp.ebi.ac.uk/pub/software/vertebrategenomics/exonerate/exonerate-2.2.0-x86_64.tar.gz && \
-        tar -zxvf exonerate-2.2.0-x86_64.tar.gz && rm -f exonerate-2.2.0-x86_64.tar.gz`
+        tar -zxvf exonerate-2.2.0-x86_64.tar.gz && rm -f exonerate-2.2.0-x86_64.tar.gz
 ENV PATH $INSTALLPATH/exonerate-2.2.0-x86_64/bin
 
 ###     install hmmer & Antifam db      ###
