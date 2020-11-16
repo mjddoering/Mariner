@@ -1,5 +1,7 @@
 #download base image ubuntu 20.04
 # sudo docker build -t mariner:0.2b ./
+# sudo docker run -it --mount type=bind,source=/home/jakestout/,target=/home/mariner/docker mariner:0.2b bash
+#
 FROM ubuntu:20.04
 LABEL maintainer="umdoeri0@myumanitoba.ca"
 LABEL maintainer="MJD Doering"
@@ -163,7 +165,7 @@ ENV PATH $INSTALLPATH/evigene/scripts/rnaseq:$PATH
 RUN cd $INSTALLPATH && \
         wget http://ftp.ebi.ac.uk/pub/software/vertebrategenomics/exonerate/exonerate-2.2.0-x86_64.tar.gz && \
         tar -zxvf exonerate-2.2.0-x86_64.tar.gz && rm -f exonerate-2.2.0-x86_64.tar.gz
-ENV PATH $INSTALLPATH/exonerate-2.2.0-x86_64/bin
+ENV PATH $INSTALLPATH/exonerate-2.2.0-x86_64/bin:$PATH
 
 ###     install hmmer & Antifam db      ###
 RUN cd $INSTALLPATH && \
@@ -355,4 +357,4 @@ ENV PATH $INSTALLPATH/Mariner-0.2:$PATH
 ENV PATH $INSTALLPATH/Mariner-0.2/firmament:$PATH
 ENV PATH $INSTALLPATH/Mariner-0.2/sextant:$PATH
 WORKDIR /home/mariner
-#USER vega 
+#USER vega
