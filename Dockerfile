@@ -218,9 +218,9 @@ RUN cd $INSTALLPATH && \
         cd gmap-2020-10-14 && ./configure && \
         make && make install
 RUN cd $INSTALLPATH && \
-        wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.10.1+-x64-linux.tar.gz && \
-        tar -zxvf ncbi-blast-2.10.1+-x64-linux.tar.gz && rm -f ncbi-blast-2.10.1+-x64-linux.tar.gz
-ENV PATH $INSTALLPATH/ncbi-blast-2.10.1+/bin:$PATH
+        wget https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.11.0+-x64-linux.tar.gz && \
+        tar -zxvf ncbi-blast-2.11.0+-x64-linux.tar.gz && rm -f ncbi-blast-2.11.0+-x64-linux.tar.gz
+ENV PATH $INSTALLPATH/ncbi-blast-2.11.0+/bin:$PATH
 RUN cd $INSTALLPATH && \
         wget ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz && \
         tar -zxvf EMBOSS-6.6.0.tar.gz && rm -f EMBOSS-6.6.0.tar.gz && \
