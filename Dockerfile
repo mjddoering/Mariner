@@ -1,11 +1,11 @@
 #download base image ubuntu 20.04
-# sudo docker build -t mariner:0.2b ./
+# sudo docker build -t mariner:0.2c ./
 # sudo docker run -it --mount type=bind,source=/home/jakestout/,target=/home/mariner/docker mariner:0.2b bash
 #
 FROM ubuntu:20.04
 LABEL maintainer="umdoeri0@myumanitoba.ca"
 LABEL maintainer="MJD Doering"
-LABEL version="0.2b"
+LABEL version="0.2c"
 LABEL description="This is installation of de novo transcriptome assemblers and their dependencies \
         * IDBA-Tran \
         * rnaSPAdes \
@@ -68,12 +68,6 @@ RUN cd $INSTALLPATH && \
         wget --no-check-certificate http://cab.spbu.ru/files/release3.14.1/SPAdes-3.14.1-Linux.tar.gz && \
         tar -zxvf SPAdes-3.14.1-Linux.tar.gz && rm -f SPAdes-3.14.1-Linux.tar.gz
 ENV PATH $INSTALLPATH/SPAdes-3.14.1-Linux/bin:$PATH
-
-###     install Salmon                  ###
-RUN cd $INSTALLPATH && \
-        wget --no-check-certificate https://github.com/COMBINE-lab/salmon/releases/download/v1.3.0/salmon-1.3.0_linux_x86_64.tar.gz && \
-        tar -zxvf salmon-1.3.0_linux_x86_64.tar.gz && rm -f salmon-1.3.0_linux_x86_64.tar.gz
-ENV PATH $INSTALLPATH/salmon-latest_linux_x86_64/bin:$PATH
 
 ###     install SOAPdenovo-Trans        ###
 RUN cd $INSTALLPATH && \
@@ -189,7 +183,7 @@ RUN cd $INSTALLPATH && \
 RUN cd $INSTALLPATH && \
         wget https://github.com/COMBINE-lab/salmon/releases/download/v0.4.0/SalmonBeta-0.4.0_Ubuntu-14.04.tar.gz && \
         tar -zxvf SalmonBeta-0.4.0_Ubuntu-14.04.tar.gz && rm -f SalmonBeta-0.4.0_Ubuntu-14.04.tar.gz
-ENV PATH $INSTALLPATH/SalmonBeta-0.4.0_Ubuntu-14.04.tar.gz/bin:$PATH
+ENV PATH $INSTALLPATH/SalmonBeta-0.4.0_Ubuntu-14.04/bin:$PATH
 RUN cd $INSTALLPATH && \
         wget https://github.com/torognes/vsearch/archive/v1.8.0.tar.gz && \
         tar -zxvf v1.8.0.tar.gz && rm -f v1.8.0.tar.gz && \
@@ -199,8 +193,9 @@ ENV PATH $INSTALLPATH/vsearch-1.8.0:$PATH
 ENV PATH $INSTALLPATH/vsearch-1.8.0/bin:$PATH
 RUN cd $INSTALLPATH && \
         wget https://github.com/amplab/snap/releases/download/v1.0beta.18/snap-aligner && \
-        mkdir snap-1.0beta.18 && mv snap-aligner snap-1.0beta.18
+        mkdir snap-1.0beta.18 && mv snap-aligner snap-1.0beta.18 && chmod 777 $INSTALLPATH/snap-1.0beta.18/snap-aligner
 ENV PATH $INSTALLPATH/snap-1.0beta.18:$PATH
+###     transrate-tools doesn't install correctly for me, run transfuse --install before running transfuse to get it
 
 ###     install Detonate                ###
 RUN cd $INSTALLPATH && \
