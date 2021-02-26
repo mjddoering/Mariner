@@ -36,7 +36,7 @@ evi4F --> TF2,403,4 assemblies merged,evigene full set &#8594; Transfuse (filter
 evi4F --> TF3,403,4 assemblies merged,evigene full set &#8594; Transfuse (filter &#8594; vsearch &#8594; Transrate),,24955011,49.08047558,11533,25030919,64.94468722,41063128,16032209,21085,12573,8512,7247,0.634359233,0.596300688,0.403699312,0.614741474
 evi4 --> TF --> Det,404,4 assemblies merged,evigene full set &#8594; Transfuse (filter &#8594; vsearch &#8594; Transrate) &#8594; Detonate,,24810144,48.7955572,11426,24913192,64.63923526,38573430,13660238,19979,12441,7538,7379,0.627699294,0.622703839,0.377296161,0.625191588
 transfuse 1 (filter),405,4 assemblies merged,"Transfuse (filter) (failed at first stage of Transfuse, during Snap alignment of reads while running Transrate)","failed at first stage of Transfuse, during Snap alignment of reads while running Transrate",0,0,0,0,0,0,0,0,0,0,19820,,,,
-TPM >0,405,4 assemblies merged,"TPM>0 (TPM filtering added due to failure at first stage of Transfuse, during Snap alignment of reads while running Transrate)",TPM filtering stage added due to Transfuse failure (Snap read alignment in Transrate),27251793,53.5976907,13041,27406237,71.10763651,85000898,57594661,50108,14704,35404,5116,0.741876892,0.293446156,0.706553844,0.420546848
+TPM >0,405,4 assemblies merged,"TPM>0 (TPM filtering added due to failure at first stage of Transfuse, during Snap alignment of reads while running Transrate)","TPM filtering stage added due to Transfuse failure (Snap read alignment in Transrate)",27251793,53.5976907,13041,27406237,71.10763651,85000898,57594661,50108,14704,35404,5116,0.741876892,0.293446156,0.706553844,0.420546848
 TPM --> Transfuse,405,4 assemblies merged,"TPM>0 &#8594; Transfuse (Transfuse failed at read alignment; TPM filtering added due to failure at first stage of Transfuse, during Snap alignment of reads while running Transrate)",TPM filtering stage added due to Transfuse failure (Snap read alignment in Transrate),0,0,0,0,0,0,0,0,0,0,19820,,,,
 TPM --> Detonate,406,4 assemblies merged,"TPM>0 &#8594; Detonate (Transfuse failed both before and after TPM filtering; TPM filtering added due to failure at first stage of Transfuse, during Snap alignment of reads while running Transrate)",TPM filtering stage added due to Transfuse failure (Snap read alignment in Transrate),27037405,53.17604131,12868,27219042,70.62194436,69845020,42625978,41791,14496,27295,5324,0.731382442,0.346868943,0.653131057,0.470565321
 ORP 1 (orthomerged),408,4 assemblies merged,ORP (orthomerged),,22139207,43.54246963,11626,22514419,58.41543013,130506366,107991947,29550,13261,16289,6559,0.669071645,0.448764805,0.551235195,0.537208831
@@ -181,25 +181,3 @@ median,106,median,of all single k-mer assemblies,,21361285,42.01248506,10544.5,2
 "cat 4, 90%aa --> 95% nt identity --> tpm>1 -->TR 3/4",407,4 assemblies merged,DRAP (cluster ORFs at 90% aa identity &#8594; cluster contigs at 95% nt identity &#8594; TPM>1 &#8594;  Transrate contigs passing 3 of 4 criteria (used Salmon TPM>1; original method used eXpress FPKM>1 &amp;contigs meeting min. threshold based on all 4 crieteria),,14857087,29.22029951,8119,15099509,39.17686319,22159706,7060197,14457,9142,5315,10678,0.461251261,0.632358027,0.367641973,0.533418911
 "cat 4, 90%aa --> 95% nt identity --> tpm>0 -->TR 4/4",407,4 assemblies merged,DRAP (cluster ORFs at 90% aa identity &#8594; cluster contigs at 95% nt identity &#8594; TPM>0 &#8594;  Transrate contigs passing 4 of 4 criteria (used Salmon TPM>0; original method used eXpress FPKM>1),,10486655,20.624716,6261,10712331,27.79398496,13525837,2813506,10332,7078,3254,12742,0.357114026,0.685056136,0.314943864,0.469487928
 "cat 4, 90%aa --> 95% nt identity --> tpm>1 -->TR 4/4",407,4 assemblies merged,DRAP (cluster ORFs at 90% aa identity &#8594; cluster contigs at 95% nt identity &#8594; TPM>1 &#8594;  Transrate contigs passing 4 of 4 criteria (used Salmon TPM>1; original method used eXpress FPKM>1),,10133091,19.92934106,6191,10353993,26.86424884,13190931,2836938,10197,7005,3192,12815,0.353430878,0.686966755,0.313033245,0.466735517
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,,,,,
