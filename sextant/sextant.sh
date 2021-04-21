@@ -1,7 +1,10 @@
 #!/usr/bin/bash
+#todo
+	# might split out AntiFam to separate function
+
 #######################################
 # Default parameters adjustable on command line
-DEFIN="Firmament/*fa" #input directory
+DEFIN="firmament/*fa" #input directory
 DEFC="FALSE" #run consensus
 DEFE="FALSE" #run evigene
 DEFF="FALSE" #run TPM filtering
@@ -48,7 +51,7 @@ printVersion () {
 	echo -e "\t _\__ \/ -_) \ /  _/ _' | ' \  ______|"
 	echo -e "\t|_____/\___/_\_\\\\\\__\__,_|_||_\__|"
 	echo -e "\t  Sextant, a part of the Mariner suite"
-	echo -e "\t                     v. 0.1/2021.03.01\v"
+	echo -e "\t                     v. 0.1c/2021.04.14\v"
 }
 
 #######################################
@@ -82,14 +85,16 @@ printHelp () {
 	echo -e "\t\t     \tbased on Salmon alignment); default is do not run"
 	echo -e "\t\t-t	Flag to run Transfuse filtering; default is do not run"
 	echo -e "\t\t-d	Flag to run Detonate contig filtering; default is do not run"
-	echo -e "\t\t-p	Path to Detonate parameter file; if omitted it will be"
+	echo -e "\t\t  -p	Path to Detonate parameter file; if omitted it will be"
 	echo -e "\t\t     \tcreated based on the contig sequences (not ideal)"
-	echo -e "\t\t-r	Read length, used by Detonate"
+	echo -e "\t\t  -r	Read length, used by Detonate"
 	echo -e "\t\t-g	Flag to run Corset isoform grouping, default is do not run"
 	echo -e "\t\t-s	Flag to run summary stats, if this is the only flag set"
-	echo -e "\t\t     \tthen it runs summary stats on selected input files otherwise"
-	echo -e "\t\t     \truns summaries on files produced in earlier steps of that"
-	echo -e "\t\t     \tSextant run. Default, no flag, is do not run summaries"
+	echo -e "\t\t     \tthen it runs summary stats on all *.fa files in the specified"
+	echo -e "\t\t     \tdirectory, otherwise runs summaries on files produced in earlier"
+	echo -e "\t\t     \tsteps of that Sextant run. Default, no flag, is do not run summaries"
+	echo -e "\t\t  -X	Number of bases in contig set / assembly / simulation to use"
+	echo -e "\t\t     \tfor Nx_s and Lx_s calculations ( x in 1..(len(fa)/X) )"
 	echo -e "\t\t-n	Number of threads available to run in parallel"
 	echo -e "\t\t-m	Memory available to be used (in Mb)"
 	echo -e "\t\t-h Flag to print this message"
@@ -108,13 +113,13 @@ printERR () {
 #######################################
 printUsage () {
 	printVersion
-	#SCRIPTLOC="${BASH_SOURCE[0]}"
-	echo -e "\tRun Consensus: sextant.sh -i Firmament/*.fa -o Dataset1 -c -n 4 -m 256000"
-	echo -e "\tRun Transfuse: sextant.sh -i Mariner/output/Dataset1.01.consensus2.tr.fa -1 path/to/reads1.fq -2 path/to/reads2.fq -o Dataset1 -t -n 4"
-	echo -e "\tRun Detonate: sextant.sh -i Mariner/output/Dataset1.04c.TF3.fa -1 path/to/reads1.fq -2 path/to/read2.fq -o Dataset1 -d -p path/to/paramFile -n 4"
-	echo -e "\tRun Corset: sextant.sh -i Mariner/output/Dataset1.05.Detonate.fa -1 path/to/reads1.fq -2 path/to/read2.fq -o Dataset1 -g -p path/to/paramFile -n 4"
-	echo -e "\tUsage: sextant.sh -h"
-	echo -e "\tUsage: sextant.sh -v"
+	SCRIPTLOC="${BASH_SOURCE[0]}"
+	echo -e "\tRun Consensus: $SCRIPTLOC -i Firmament/*.fa -o Dataset1 -c -n 4 -m 256000"
+	echo -e "\tRun Transfuse: $SCRIPTLOC -i Mariner/output/Dataset1.01.consensus2.tr.fa -1 path/to/reads1.fq -2 path/to/reads2.fq -o Dataset1 -t -n 4"
+	echo -e "\tRun Detonate: $SCRIPTLOC -i Mariner/output/Dataset1.04c.TF3.fa -1 path/to/reads1.fq -2 path/to/read2.fq -o Dataset1 -d -p path/to/paramFile -n 4"
+	echo -e "\tRun Corset: $SCRIPTLOC -i Mariner/output/Dataset1.05.Detonate.fa -1 path/to/reads1.fq -2 path/to/read2.fq -o Dataset1 -g -p path/to/paramFile -n 4"
+	echo -e "\tUsage: $SCRIPTLOC -h"
+	echo -e "\tUsage: $SCRIPTLOC -v"
 }
 
 CONSENSUS=""
@@ -126,8 +131,9 @@ CORSET=""
 SUMMARY=""
 READLEN=""
 DETPARAM=""
+SUMMREFX=""
 
-while getopts :i:1:2:o:ceftdp:r:gsn:m:hv OPTIONS; do
+while getopts :i:1:2:o:ceftdp:r:gsX:n:m:hv OPTIONS; do
 case $OPTIONS in
 	i) INPUT=${OPTARG};;
 	1) READS1=${OPTARG};;
@@ -141,7 +147,8 @@ case $OPTIONS in
 	p) DETPARAM=${OPTARG};;
 	r) READLEN=${OPTARG};;
 	g) CORSET=TRUE;;
-	s) SUMMARY=${OPTARG};;
+	s) SUMMARY=TRUE;;
+	X) SUMMREFX=${OPTARG};;
 	n) THREADS=${OPTARG};;
 	m) MEM=${OPTARG};;
 	h) printHelp;;
@@ -202,7 +209,7 @@ if [[ $SUMMARY == "" ]]; then
 	SUMMARY=$DEFSUM
 	MARINER7="Report contig set summaries:\tNo"
 else
-	MARINER7="Run summary evaluation:\tYes"
+	MARINER7="Report contig set summaries:\tYes"
 fi
 if [[ $THREADS == "" ]]; then
 	THREADS=$DEFN
@@ -238,11 +245,13 @@ REPFILE="$OUTDIR/Mariner.report.txt"
 #######################################
 # A. Linearize fasta
 #	accepts 2 arguments: "file.fa" "file.lin.fa"
+#	sorting stage added to avoid some failure situations with the grepFA function
 linearizeFA () {
 	sed -e '/^>/s/$/@/' -e 's/^>/#/' $1 | \
 		sed -e '/^-/s/^-.*/\t/' | \
 		tr -d '\n' | \
-		tr "#" "\n" | \
+		tr "#" "\n" |
+		sort | \
 		sed '/^\s*$/d' | \
 		tr "@" "\t" | \
 		sed -e 's/^/>/' -e 's/\t/\n/' | \
@@ -266,8 +275,9 @@ grepFA () {
 		sed -E "s/([ACGT])(>)/\1\n\2/g" | \
 		sed 's/[[:blank:]]*$//' \
 		> $2
+# grep -A 1 -wFf $1 $INPUT | sed -e '/^>/s/$/@/' -e 's/^>/#/' | sed -e '/^-/s/^-.*/\t/' | tr -d '\n' | tr "#" "\n" | sed '/^\s*$/d' | tr "@" "\t" | sed -e 's/^/>/' -e 's/\t/\n/' | sed -E "s/([ACGT])(>)/\1\n\2/g" | sed 's/[[:blank:]]*$//' > $2
 	LINESID=$(sed "/transcript_id/d" $1 | wc -l)
-	SEQFA=$(grep -c "^>" $s)
+	SEQFA=$(grep -c "^>" $2)
 	if [[ $LINESID == $SEQFA ]]; then
 		echo -e "$SEQFA sequences written to $2"
 		echo -e "$SEQFA sequences written to $2" >> $REPFILE
@@ -286,9 +296,12 @@ lenCal () {
 }
 
 #######################################
-# D. check that the read files exist, other wirte error message and exit
+# D. check that the read files exist, other write error message and exit
 checkReads () {
 	if [[ -f "$READS1" ]]; then
+		echo -e "Reads 1 file found: $READS1"
+		echo -e "Reads 1 file found: $READS1" >> $REPFILE
+	else
 		echo -e "Please ensure that $READS1 exists"
 		echo -e "Currently Mariner expects both forward and reverse reads as unzipped fastq files"
 		echo -e "Please ensure that $READS1 exists" >> $REPFILE
@@ -296,6 +309,9 @@ checkReads () {
 		kill -INT $$
 	fi
 	if [[ -f "$READS2" ]]; then
+		echo -e "Reads 2 file found: $READS2"
+		echo -e "Reads 2 file found: $READS2" >> $REPFILE
+	else
 		echo -e "Please ensure that $READS2 exists"
 		echo -e "Currently Mariner expects both forward and reverse reads as unzipped fastq files"
 		echo -e "Please ensure that $READS2 exists" >> $REPFILE
@@ -305,10 +321,21 @@ checkReads () {
 	FILETYPE1=$(rev <<< "$READS1" | cut -d "." -f1 | rev)
 	FILETYPE2=$(rev <<< "$READS2" | cut -d "." -f1 | rev)
 	if [[ $FILETYPE1 != "fq" || $FILETYPE2 != "fq" ]]; then
-		echo -e "Please ensure that both read files are provided as unzipped fastq files"
-		echo -e "Please ensure that both read files are provided as unzipped fastq files" >> $REPFILE
+		echo -e "Please ensure that both read files are provided as unzipped fastq files (expecting *.fq file name)"
+		echo -e "Please ensure that both read files are provided as unzipped fastq files (expecting *.fq file name)" >> $REPFILE
 		kill -INT $$
 	fi
+}
+
+#######################################
+# E. cat input and linearize
+parseInput () {
+	# create the input file; can be a list in the form dir/*fa
+	mkdir -p $OUTDIR/input
+	echo $INPUT
+	cat $INPUT > $OUTDIR/input/$FILEROOT.fa
+	linearizeFA "$OUTDIR/input/$FILEROOT.fa" "$OUTDIR/input/$FILEROOT.lin.fa"
+	echo -e "$(date) parsing input completed" >> $REPFILE
 }
 
 #######################################
@@ -362,31 +389,32 @@ consensual () {
 #######################################
 # 2. EvidentialGene, with Antifam screening of ORFs of ok+cull
 evidencing () {
-	local FAFILE=$(rev <<< "$INPUT" | cut -d "/" -f1 | rev | cut -d "." -f1)
+	FAFILE=$(rev <<< "$INPUT" | cut -d "/" -f1 | cut -d "." -f2- | rev)
 	echo -e "##################"
-	echo -e "##################" >> $REPFILE
+	echo -e "##################" >> ../../$REPFILE
 	echo -e started EvidentialGene filtering at $(date) for $INPUT : "tr2aacds4.pl -mrnaseq $FAFILE.fa -NCPU=$THREADS -MAXMEM=$MEM -logfile -tidyup -MINCDS=$MINEVICDS"
-	echo -e started EvidentialGene filtering at $(date) for $INPUT : "tr2aacds4.pl -mrnaseq $FAFILE.fa -NCPU=$THREADS -MAXMEM=$MEM -logfile -tidyup -MINCDS=$MINEVICDS" >> $REPFILE
-	tr2aacds4.pl -mrnaseq $ASSEMBLY -NCPU=$THREADS -MAXMEM=$MEM -logfile -tidyup -MINCDS=$MINEVICDS
+	echo -e started EvidentialGene filtering at $(date) for $INPUT : "tr2aacds4.pl -mrnaseq $FAFILE.fa -NCPU=$THREADS -MAXMEM=$MEM -logfile -tidyup -MINCDS=$MINEVICDS" >> ../../$REPFILE
+	tr2aacds4.pl -cdnaseq $FAFILE.fa -NCPU=$THREADS -MAXMEM=$MEM -logfile -tidyup -MINCDS=$MINEVICDS
 
 	echo -e "\tstarted EvidentialGene filtering at" $(date) for $INPUT : "file parsing"
-	echo -e "\tstarted EvidentialGene filtering at" $(date) for $INPUT : "file parsing" >> $REPFILE
-	cat okayset/$FAFILE.okay.aa okayset/$FAFILE.okalt.aa > okayset/$FAFILE.evi4Full.aa
-	cat okayset/$FAFILE.okay.cds okayset/$FAFILE.okalt.cds > okayset/$FAFILE.evi4Full.cds
+	echo -e "\tstarted EvidentialGene filtering at" $(date) for $INPUT : "file parsing" >> ../../$REPFILE
+	cat okayset/$FAFILE.okay.*aa okayset/$FAFILE.okalt.*aa > okayset/$FAFILE.evi4Full.aa
+	cat okayset/$FAFILE.okay.*cds okayset/$FAFILE.okalt.*cds > okayset/$FAFILE.evi4Full.cds
 	cat okayset/$FAFILE.okay.tr okayset/$FAFILE.okalt.tr > okayset/$FAFILE.evi4Full.tr
 	#linearize ok set and full set, from okay (2nd pass) directory
-	linearizeFA "okayset/$FAFILE.okay.aa" "$OUTDIR/02-evigene/$FAFILE.evi4Okay.aa"
-	linearizeFA "okayset/$FAFILE.okay.cds" "$OUTDIR/02-evigene/$FAFILE.evi4Okay.cds"
-	linearizeFA "okayset/$FAFILE.okay.tr" "$OUTDIR/02-evigene/$FAFILE.evi4Okay.tr"
-	linearizeFA "okayset/$FAFILE.evi4Full.aa" "$OUTDIR/02-evigene/$FAFILE.evi4Full.aa"
-	linearizeFA "okayset/$FAFILE.evi4Full.cds" "$OUTDIR/02-evigene/$FAFILE.evi4Full.cds"
-	linearizeFA "okayset/$FAFILE.evi4Full.tr" "$OUTDIR/02-evigene/$FAFILE.evi4Full.tr"
+	linearizeFA "okayset/$FAFILE.okay.*aa" "../../$OUTDIR/02-evigene/$FAFILE.evi4Okay.aa"
+	linearizeFA "okayset/$FAFILE.okay.*cds" "../../$OUTDIR/02-evigene/$FAFILE.evi4Okay.cds"
+	linearizeFA "okayset/$FAFILE.okay.tr" "../../$OUTDIR/02-evigene/$FAFILE.evi4Okay.tr"
+	linearizeFA "okayset/$FAFILE.evi4Full.aa" "../../$OUTDIR/02-evigene/$FAFILE.evi4Full.aa"
+	linearizeFA "okayset/$FAFILE.evi4Full.cds" "../../$OUTDIR/02-evigene/$FAFILE.evi4Full.cds"
+	linearizeFA "okayset/$FAFILE.evi4Full.tr" "../../$OUTDIR/02-evigene/$FAFILE.evi4Full.tr"
+	cd $WD
 
 	################ AntiFam
 	mkdir -p $OUTDIR/02-evigene/AntiFam
 
-	echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "hmmsearch --cpu $THREADS --tblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.tblout.txt --domtblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.domtblout.txt -o $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.out.txt --noali --cut_ga /home/mariner/software/AntiFam_6.0/AntiFam_Eukaryota.hmm $OUTDIR/02-evigene/$FAFILE.evi4Full.aa"
-	echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "hmmsearch --cpu $THREADS --tblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.tblout.txt --domtblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.domtblout.txt -o $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.out.txt --noali --cut_ga /home/mariner/software/AntiFam_6.0/AntiFam_Eukaryota.hmm $OUTDIR/02-evigene/$FAFILE.evi4Full.aa" >> $REPFILE
+	echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "hmmsearch --cpu $THREADS --tblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt --domtblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.domtblout.txt -o $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.out.txt --noali --cut_ga /home/mariner/software/AntiFam_6.0/AntiFam_Eukaryota.hmm $OUTDIR/02-evigene/$FAFILE.evi4Full.aa"
+	echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "hmmsearch --cpu $THREADS --tblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt --domtblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.domtblout.txt -o $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.out.txt --noali --cut_ga /home/mariner/software/AntiFam_6.0/AntiFam_Eukaryota.hmm $OUTDIR/02-evigene/$FAFILE.evi4Full.aa" >> $REPFILE
 	hmmsearch --cpu $THREADS \
 		--tblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt \
 		--domtblout $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.domtblout.txt \
@@ -398,13 +426,13 @@ evidencing () {
 
 		echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "parsing output"
 		echo -e "\tstarted AntiFam hmmsearch at" $(date) for $INPUT : "parsing output" >> $REPFILE
-		awk '{print $1}' $OUTDIR/02-evigene/AntiFam/hmmsearch.$PFAM.$FAFILE.tblout.txt | sort -u > $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt.id
+		awk '{print $1}' $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt | sort -u > $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt.id
 		grep "^>" $OUTDIR/02-evigene/$FAFILE.evi4Full.aa | cut -d " " -f 1 | cut -d ">" -f 2 > $OUTDIR/02-evigene/AntiFam/$FAFILE.id
 		#get IDs that are unique to assembly set of IDs
 		comm -13 <(sort $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt.id) <(sort $OUTDIR/02-evigene/AntiFam/$FAFILE.id) > $OUTDIR/02-evigene/AntiFam/$FAFILE.AF.id
 		sed -e 's/utrorf//' $OUTDIR/02-evigene/AntiFam/$FAFILE.AF.id | sort -u > $OUTDIR/02-evigene/AntiFam/$FAFILE.AF.tr.id
 
-		NUMAF=$(comm -12 $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt.id <(sort $OUTDIR/AntiFam/$FAFILE.id) | wc -l)
+		NUMAF=$(comm -12 $OUTDIR/02-evigene/AntiFam/hmmsearch.$FAFILE.tblout.txt.id <(sort $OUTDIR/02-evigene/AntiFam/$FAFILE.id) | wc -l)
 		echo "Number of AntiFam hits among translated coding sequences in $FAFILE.evi4Full.aa: $NUMAF"
 
 		#extract the sequences passing the Antifam filter, remove this is the goal is just to count ORFs that fail the step
@@ -415,8 +443,8 @@ evidencing () {
 
 		#older versions of evigene renamed contigs, no longer seems to be the case
 		#code to rename contigs back to original names has been removed
-		NUMEVIFTR=$(grep -c "^>" $OUTPUTDIR/$FAFILE.evi4Full.tr)
-		NUMAFTR=$(grep -c "^>" $OUTPUTDIR/AntiFam/$FAFILE.$PFAM.tr.fa)
+		NUMEVIFTR=$(grep -c "^>" $OUTDIR/02-evigene/$FAFILE.evi4Full.tr)
+		NUMAFTR=$(grep -c "^>" $OUTDIR/02-evigene/AntiFam/$FAFILE.AF.tr.fa)
 		echo -e "\tNumber transcripts in evigene4 Full output: $NUMEVIFTR"
 		echo -e "\tNumber transcripts in evi4Full-->AntiFam output: $NUMAFTR"
 		echo -e "\tNumber transcripts in evigene4 Full output: $NUMEVIFTR" >> $REPFILE
@@ -433,15 +461,15 @@ filtering () {
 	echo -e "##################" >> $REPFILE
 	echo -e "started Salmon TPM filtering at $(date) for $INPUT: salmon index"
 	echo -e "started Salmon TPM filtering at $(date) for $INPUT: salmon index" >> $REPFILE
-	SALMONVER=$(~/RNASeq/salmon-latest_linux_x86_64/bin/salmon -v | cut -d" " -f2-)
-	if [[ $SALMONVER = "" ]]; then
-		echo -e "/trunning salmon version $SALMONVER ... proceeding"
-		echo -e "/trunning salmon version $SALMONVER ... proceeding" >> $REPFILE
+	SALMONVER=$($SALMONDIR/salmon -v | cut -d" " -f2-)
+	if [[ $SALMONVER != "" ]]; then
+		echo -e "\trunning salmon version $SALMONVER ... proceeding"
+		echo -e "\trunning salmon version $SALMONVER ... proceeding" >> $REPFILE
 	else
-		echo -e "/tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed"
-		echo -e "/tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed" >> $REPFILE
+		echo -e "\tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed"
+		echo -e "\tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed" >> $REPFILE
 	fi
-	$SALMONDIR/salmon index -p $SLURM_NTASKS_PER_NODE \
+	$SALMONDIR/salmon index -p $THREADS \
 		-t $INPUT \
 		-i $OUTDIR/03-TPMfiltering/index \
 		-k $SALMONK
@@ -460,7 +488,7 @@ filtering () {
 		-1 $READS1 \
 		-2 $READS2 \
 		--validateMappings \
-		-p $SLURM_NTASKS_PER_NODE \
+		-p $THREADS \
 		-o $OUTDIR/03-TPMfiltering
 
 	echo -e "\tstarted Salmon TPM filtering at $(date) for $INPUT: file parsing"
@@ -478,27 +506,33 @@ filtering () {
 # 4. Transfuse
 transfusing () {
 	echo -e "##################"
-	echo -e "##################" >> $REPFILE
+	echo -e "##################" >> ../../$REPFILE
 	echo -e "started Transfuse filtering at $(date) for $INPUT"
-	echo -e "started Transfuse filtering at $(date) for $INPUT" >> $REPFILE
-	transfuse --install
-	#check that the read files exist
-	checkReads
-	echo -e "\tread files found"
-	echo -e "\tread files found" >> $REPFILE
+	echo -e "started Transfuse filtering at $(date) for $INPUT" >> ../../$REPFILE
 
-	transfuse -a $INPUT \
-		-l $READS1 \
-		-r $READS2 \
+	FAFILE=$(rev <<< "$INPUT" | cut -d "/" -f1 | cut -d "." -f2- | rev)
+
+	transfuse --install
+
+	transfuse -a ../../$INPUT \
+		-l ../../$READS1 \
+		-r ../../$READS2 \
 		-o $FILEROOT.TF.fa \
 		-t $THREADS \
 		-v
-	rm $FAFILE*transfuse*
-	rm -r transrate*$FAFILE*
-	rm -r transrate_*transfuse*
+	#remove intermediate folders containing large bam files
+	if ls $FAFILE*transfuse* 1> /dev/null 2>&1; then
+		rm $FAFILE*transfuse*
+	fi
+	if ls transrate*$FAFILE* 1> /dev/null 2>&1; then
+		rm -r transrate*$FAFILE*
+	fi
+	if ls transrate_*$FILEROOT* 1> /dev/null 2>&1; then
+		rm -r transrate_*$FILEROOT*
+	fi
 
 	echo -e "completed Transfuse filtering at $(date) for $INPUT"
-	echo -e "completed Transfuse filtering at $(date) for $INPUT" >> $REPFILE
+	echo -e "completed Transfuse filtering at $(date) for $INPUT" >> ../../$REPFILE
 }
 
 #######################################
@@ -509,17 +543,13 @@ detonating () {
 	echo -e "started Detonate contig removal at $(date) for $INPUT"
 	echo -e "started Detonate contig removal at $(date) for $INPUT" >> $REPFILE
 
-	#check that the read files exist
-	checkReads
-	echo -e "\tread files found"
-	echo -e "\tread files found" >> $REPFILE
-
 	#check if param file exists, if it doesn't then create it using the contigs themselves
 	if [[ -f "$DETPARAM" ]]; then
 		echo -e "\tProvided parameter file found, using $DETPARAM"
 		echo -e "\tProvided parameter file found, using $DETPARAM" >> $REPFILE
 	else
 		rsem-eval-estimate-transcript-length-distribution $INPUT $OUTDIR/05-detonate/param.txt
+		DETPARAM="$OUTDIR/05-detonate/param.txt"
 		echo -e "\tNo parameter file provided, created $DETPARAM using $INPUT sequences"
 		echo -e "\tNo parameter file provided, created $DETPARAM using $INPUT sequences" >> $REPFILE
 	fi
@@ -549,6 +579,9 @@ detonating () {
 	#get the original assembled sequence
 	grepFA "$OUTDIR/05-detonate/$FILEROOT.det.score.isoforms.results.out" "$OUTDIR/05-detonate/$FILEROOT.detonate.fa"
 
+	#final file cleanup
+	rm -r $OUTDIR/05-detonate/*.stat
+
 	echo -e "completed Detonate contig removal at $(date) for $INPUT"
 	echo -e "completed Detonate contig removal at $(date) for $INPUT" >> $REPFILE
 }
@@ -560,22 +593,19 @@ corseting () {
 	echo -e "##################" >> $REPFILE
 	echo -e "started Corset isoform merge at $(date) for $INPUT: salmon index"
 	echo -e "started Corset isoform merge at $(date) for $INPUT: salmon indexs" >> $REPFILE
-	FILEROOT=$(rev <<< "$FILE" | cut -d "." -f 2- | rev)
+	FILEROOT=$( echo $FILE | cut -d "." -f 1 )
 	#create salmon index first, then salmon to align reads
-	SALMONVER=$(~/RNASeq/salmon-latest_linux_x86_64/bin/salmon -v | cut -d" " -f2-)
-	if [[ $SALMONVER = "" ]]; then
-		echo -e "/trunning salmon version $SALMONVER ... proceeding"
-		echo -e "/trunning salmon version $SALMONVER ... proceeding" >> $REPFILE
+	SALMONVER=$($SALMONDIR/salmon -v | cut -d" " -f2-)
+	if [[ $SALMONVER != "" ]]; then
+		echo -e "\trunning salmon version $SALMONVER ... proceeding"
+		echo -e "\trunning salmon version $SALMONVER ... proceeding" >> $REPFILE
 	else
-		echo -e "/tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed"
-		echo -e "/tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed" >> $REPFILE
+		echo -e "\tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed"
+		echo -e "\tyou may be running the out of date Salmon used by Transfuse ... attempting to proceed" >> $REPFILE
 	fi
-	$SALMONDIR/	salmon index -t $INPUT \
+	$SALMONDIR/salmon index -t $INPUT \
 		-i $OUTDIR/06-corset/index \
 		-k $SALMONK
-
-		#check that the read files exist
-		checkReads
 
 		echo -e "\tread files found"
 		echo -e "\tread files found" >> $REPFILE
@@ -601,10 +631,14 @@ corseting () {
 
 	echo -e "\tCorset isoform merge at  $(date) for $INPUT: parse clusters"
 	echo -e "\tstarted Corset isoform merge at $(date) for $INPUT: parse clusters" >> $REPFILE
-	for D in $CORSETD; do
-		join -1 1 -2 1 <(sort -k 1b,1 $OUTDIR/06-corset/corset*/corset-clusters-"$D".txt) <(sort -k 1b,1 $OUTDIR/06-corset/quant.sf) > $OUTDIR/06-corset/corset.$D.clusters.join
+	#convert the comma delimited list needed for Corset into the space delimited list needed here
+	CORSETDL=$(echo $CORSETD | sed "s/,/ /g")
+	for D in $CORSETDL; do
+		join -1 1 -2 1 <(sort -k 1b,1 $OUTDIR/06-corset/corset-clusters-"$D".txt) <(sort -k 1b,1 $OUTDIR/06-corset/quant.sf) > $OUTDIR/06-corset/corset.$D.clusters.join
 		awk '{ print $0, "\t", $6/$3 }' $OUTDIR/06-corset/corset.$D.clusters.join | sort -k7,7nr -k3,3nr | sort -u -k2,2 | sort -k7,7nr | cut -d" " -f1 | sort > $OUTDIR/06-corset/corset.$D.clusters.id
 		grepFA "$OUTDIR/06-corset/corset.$D.clusters.id" $OUTDIR/06-corset/$FILEROOT.06.Corset.$D.fa
+		echo -e "\t$(date) completed Corset d=$D completed"
+		echo -e "\t$(date) completed Corset d=$D completed" >> $REPFILE
 	done
 
 	echo -e "completed Corset isoform merge at $(date) for $INPUT"
@@ -616,40 +650,65 @@ corseting () {
 summarizing () {
 	echo -e "##################"
 	echo -e "##################" >> $REPFILE
-	echo -e "started summaries at $(date) for in $OUTDIR/fasta-summaries"
-	echo -e "started summaries at $(date) for in $OUTDIR/fasta-summaries" >> $REPFILE
+	echo -e "started summaries at $(date) for *.fa in $OUTDIR/fasta-summaries"
+	echo -e "started summaries at $(date) for *.fa in $OUTDIR/fasta-summaries" >> $REPFILE
 
 	mkdir -p $OUTDIR/fasta-summaries/len
+	mkdir -p $OUTDIR/fasta-summaries/tmp
 	touch $OUTDIR/fasta-summaries/Mariner.summary.csv
-	cat "fasta,number of contigs,number of bases,N10,N25,N50,N75,N90,auN,average contig length,median contig length,min contig length,max contig length,number contigs shorter than 200 bp, number contigs shorter than 500bp, number contigs longer than 1000 bp, number contigs longer than 10000 bp" >> $OUTDIR/fasta-summaries/Mariner.summary.csv
-	for FASTA in $1; do
-		lenCal "$FASTA"
-		mv $FASTA.len.tsv $OUTDIR/fasta-summaries/len
+	echo "fasta,number of contigs,L10,L25,L50,L75,L90,auL,number of bases,N10,N25,N50,N75,N90,auN,average contig length,median contig length,min contig length,max contig length,contigs <200 bp,contigs <500bp,contigs >1000 bp,contigs >10000 bp" >> $OUTDIR/fasta-summaries/Mariner.summary.csv
+
+	for FASTA in $1/*fa; do
+
 		local FAFILE=$(rev <<< "$FASTA" | cut -d "/" -f1 | rev)
 		local file="$OUTDIR/fasta-summaries/len/$FAFILE.len.tsv"
+
+		linearizeFA "$FASTA" "$OUTDIR/fasta-summaries/tmp/$FAFILE"
+
+		lenCal "$OUTDIR/fasta-summaries/tmp/$FAFILE"
+		mv $OUTDIR/fasta-summaries/tmp/$FAFILE.len.tsv $OUTDIR/fasta-summaries/len
+
+		#no need to consume disk space, cleaning up as we go since it's just the length tsv file that is needed now
+		rm "$OUTDIR/fasta-summaries/tmp/$FAFILE"
 
 		# number of contigs
 		NCONTIGS=$(wc -l $file | cut -d" " -f1)
 		# number of bases
 		NBASES=$(awk '{ sum += $2 } END { print sum }' $file)
+
 		# N10,25,50,75,90; L10,25,50,75,90
-		n=$(($NBASES * 10 / 100 ))
-		NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N10=$len; L10=$c
+		n=`echo $NBASES | awk '{print $1 * 10 / 100}'`
+		#works, but fails for very large assemblies where it turns into a floating point situation
+		#n=$(($NBASES * 10 / 100 ))
+		#NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N10=$len; L10=$c
+		NVAL=0; c=0; while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N10=$len; L10=$c
 
-		n=$(($NBASES * 25 / 100 ))
-		NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N25=$len; L25=$c
 
-		n=$(($NBASES * 50 / 100 ))
-		NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N50=$len; L50=$c
+		#n=$(($NBASES * 25 / 100 ))
+		n=`echo $NBASES | awk '{print $1 * 25 / 100}'`
+		#NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N25=$len; L25=$c
+		NVAL=0; c=0; while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N25=$len; L25=$c
 
-		n=$(($NBASES * 75 / 100 ))
-		NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N75=$len; L75=$c
+		#n=$(($NBASES * 50 / 100 ))
+		n=`echo $NBASES | awk '{print $1 * 50 / 100}'`
+		VAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N50=$len; L50=$c
+		NVAL=0; c=0; while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N50=$len; L50=$c
+
+		#n=$(($NBASES * 75 / 100 ))
+		n=`echo $NBASES | awk '{print $1 * 75 / 100}'`
+		#NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N75=$len; L75=$c
+		NVAL=0; c=0; while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N75=$len; L75=$c
 
 		n=$(($NBASES * 90 / 100 ))
-		NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N90=$len; L90=$c
+		n=`echo $NBASES | awk '{print $1 * 90 / 100}'`
+		#NVAL=0; c=0; while [ $NVAL -le $n ]; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N90=$len; L90=$c
+		NVAL=0; c=0; while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do read contig len; NVAL=$(($NVAL + $len)); c=$(($c + 1)); done < $file; N90=$len; L90=$c
 
 		# auN=(length(contig_i)) x (length(contig_i) / length(totalAssembly)); summed for all contigs
+		#area under Nx curve
 		auN=$(awk -v LEN=$NBASES '{ AUN += $2 * $2 / LEN }  END { print AUN }' $file)
+		#using the same idea, area under the Lx curve
+		auL=$(awk -v LEN=$NBASES -v C=1 '{ AUL += C * $2 / LEN ; C+=1}  END { print AUL }' $file)
 		# longest, shortest, median, average length
 		CONTIGAVG=$(awk '{ sum += $2 } END { if (NR > 0) print sum / NR }' $file)
 		# put the lengths from col2 in an array (0...n); find the midpoint (1...n+1); if n is even then average the 2 values; else n is odd then take middle value (-1 because array starting at 0)
@@ -657,39 +716,175 @@ summarizing () {
 		CONTIGMIN=$(head -n1 $file | awk '{ print $2 }')
 		CONTIGMAX=$(tail -n1 $file | awk '{ print $2 }')
 		# N<200, N<500, N>1,000, N<10,000
+		NLT200=0
+		NLT500=0
+		NGT1000=0
+		NGT10000=0
 		NLT200=$(awk -v threshold=200 '{ if ($2 < threshold) c++ } END  {print c }' $file)
 		NLT500=$(awk -v threshold=500 '{ if ($2 < threshold) c++ } END { print c }' $file)
 		NGT1000=$(awk -v threshold=1000 '{ if ($2 > threshold) c++ } END { print c }' $file)
 		NGT10000=$(awk -v threshold=10000 '{ if ($2 > threshold) c++ } END { print c }' $file)
 
-		cat "$FASTA,$NCONTIGS,$NBASES,$N10,$N25,$N50,$N75,$N90,$auN,$CONTIGAVG,$CONTIGMEDIAN,$CONTIGMIN,$CONTIGMAX,$NLT200,$NLT500,$NGT1000,$NGT10000" >> $OUTDIR/fasta-summaries/Mariner.summary.csv
+		echo "$FASTA,$NCONTIGS,$L10,$L25,$L50,$L75,$L90,$auL,$NBASES,$N10,$N25,$N50,$N75,$N90,$auN,$CONTIGAVG,$CONTIGMEDIAN,$CONTIGMIN,$CONTIGMAX,$NLT200,$NLT500,$NGT1000,$NGT10000" >> $OUTDIR/fasta-summaries/Mariner.summary.csv
+		echo -e "$(date): $NBASES bases \t in \t $FASTA"
+		echo -e "$(date): $NBASES bases \t in \t $FASTA" >> $REPFILE
 	done
-	echo -e "completed summaries at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv"
-	echo -e "completed summaries at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv" >> $REPFILE
+	echo -e "completed short summaries at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv"
+	echo -e "completed short summaries at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv" >> $REPFILE
+
+	#write 0-100 csv files; splitting into separate loops so each runs as a set and could be set up to run with separate flags
+	for FASTA in $1/*fa; do
+		#write Nx and Lx stats in range of 1 ... 100 for each assembly in the loop above
+		mkdir -p $OUTDIR/fasta-summaries/LxNx_0-100
+
+		local FAFILE=$(rev <<< "$FASTA" | cut -d "/" -f1 | rev)
+		touch $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+		local file="$OUTDIR/fasta-summaries/len/$FAFILE.len.tsv"
+		NBASES=$(awk '{ sum += $2 } END { print sum }' $file)
+
+		NVAL=0
+		c=0
+
+		p=0
+		NX=$( head -n1 $file | cut -f2)
+		LX=0
+		echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+		for p in {1..99}; do
+			if [[ $(jobs | grep -c "sextant") -ge $THREADS ]]; then
+				wait -n
+			fi
+
+			{
+				#this is the same as the one-liners above for N/L 10,25,50,75,90
+				=$(($NBASES * $p / 100 ))
+				n=`echo $NBASES $p | awk '{print $1 * $2 / 100}'`
+				NVAL=0
+				c=0
+				#while [ $NVAL -le $n ]; do
+				while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do
+					read contig len
+					NVAL=$(($NVAL + $len))
+					c=$(($c + 1))
+				done < $file
+				NX=$len
+				LX=$c
+				echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+			} &
+		done
+		wait
+
+		p=100
+		NX=$( tail -n1 $file | cut -f2)
+		LX=$( wc -l $file | cut -d " " -f1)
+		#echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+
+		sort -k1,1n $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv > $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx.csv.tmp
+		mv $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx.csv.tmp $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+		rm $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx.csv.tmpp
+
+		#add in the column headers
+		sed -i '1 i x,Lx,Nx' $OUTDIR/fasta-summaries/LxNx_0-100/$FAFILE.LxNx.csv
+
+		echo -n "."
+		echo -n "." >> $REPFILE
+	done
+	wait
+	echo -e "completed Lx, Nx (x in 0..100) at $(date): summaries written to $OUTDIR/fasta-summaries/LxNx_0-100"
+	echo -e "completed Lx, Nx (x in 0..100) at $(date): summaries written to $OUTDIR/fasta-summaries/LxNx_0-100" >> $REPFILE
+
+	#if -X is set (length of simulation or other reference assembly) then compute
+	if  [[ $SUMMREFX != "" && $SUMMREFX >0 ]]; then
+
+		mkdir -p $OUTDIR/fasta-summaries/LxNx_refX
+		touch $OUTDIR/fasta-summaries/auLN_s.csv
+		touch $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+
+		echo "fasta,auN_s,auL_s,length of simulation assembly,length of fasta,max x (len_fa/len_sim*100)" >> $OUTDIR/fasta-summaries/auLN_s.csv
+
+		for FASTA in $1/*fa; do
+			local FAFILE=$(rev <<< "$FASTA" | cut -d "/" -f1 | rev)
+			local file="$OUTDIR/fasta-summaries/len/$FAFILE.len.tsv"
+			NBASES=$(awk '{ sum += $2 } END { print sum }' $file)
+
+			#dropping off any decimal points to give largest whole integer
+			#MAXP=$(( 100 * $NBASES / $SUMMREFX ))
+			MAXP=`echo $NBASES $SUMMREFX | awk '{print 100 * $1 / $2 }'`
+			#drop any decimal point; the awk math keeps the decimal points
+			MAXPFLR=${MAXP%.*}
+			#the last value will be the biggest value in the dataset; -1 to go up to that point only
+			#MAXPMO=$(( $MAXP - 1 ))
+			MAXPMO=`echo $MAXPFLR | awk '{print $1 - 1}'`
+
+			p=0
+			NX=$( head -n1 $file | cut -f2)
+			LX=0
+			echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+
+			for p in $(eval echo "{1..$MAXPMO}"); do
+				if [[ $(jobs | grep -c "sextant") -ge $THREADS ]]; then
+					wait -n
+				fi
+
+				{
+					#n=$(( $SUMMREFX * $p / 100 ))
+					n=`echo $SUMMREFX $p | awk '{print $1 * $2 / 100}'`
+					NVAL=0
+					c=0
+					#while [ $NVAL -le $n ]; do
+					while awk 'BEGIN {exit !('$NVAL' <= '$n')}'; do
+						read contig len
+						NVAL=$(($NVAL + $len))
+						c=$(($c + 1))
+					done < $file
+					NX=$len
+					LX=$c
+					echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+				} &
+			done
+			wait
+
+			p=$MAXPFLR
+			NX=$( tail -n1 $file | cut -f2)
+			LX=$( wc -l $file | cut -d " " -f1)
+			echo "$p,$LX,$NX" >> $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+
+			sort -k1,1n $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv > $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx_refX.csv.tmp
+			mv $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx_refX.csv.tmp $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+			rm $OUTDIR/fasta-summaries/tmp/$FAFILE.LxNx_refX.csv.tmp
+
+			#add in the column headers
+			sed -i '1 i x,Lx,Nx' $OUTDIR/fasta-summaries/LxNx_refX/$FAFILE.LxNx_refX.csv
+
+			#using the length of the simulation (or other) reference assembly allows for the area under the curves to be compared across methods and assemblies
+			auNs=$(awk -v LEN=$SUMMREFX '{ AUN += $2 * $2 / LEN }  END { print AUN }' $file)
+			auLs=$(awk -v LEN=$SUMMREFX -v C=1 '{ AUL += C * $2 / LEN ; C+=1}  END { print AUL }' $file)
+			echo -e "$(date): auN_s = $auNs \t auL_s = $auLs \t for x in range 1..$MAXPFLR for $FAFILE"
+			echo -e "$(date): auN_s = $auNs \t auL_s = $auLs \t for x in range 1..$MAXPFLR for $FAFILE" >> $REPFILE
+			echo "$FAFILE,$auNs,$auLs,$SUMMREFX,$NBASES,$MAXPFLR" >> $OUTDIR/fasta-summaries/auLN_s.csv
+		done
+		wait
+
+		echo -e "completed Lx, Nx with reference at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv"
+		echo -e "completed Lx, Nx with reference at $(date): summaries written to $OUTDIR/fasta-summaries/Mariner.summary.csv" >> $REPFILE
+	fi
 }
 
 #######################################
 #	RUN MARINER                       #
 #######################################
-
-# create the input file; can be a list in the form dir/*fa
 #	lin.fa is used to grep sequences from if necessary
 WD=$(pwd)
-mkdir -p $OUTDIR/input
-cat $INPUT > $OUTDIR/input/$FILEROOT.fa
-linearizeFA "$OUTDIR/input/input.fa" "$OUTDIR/input/$FILEROOT.lin.fa"
-echo -e "$(date) parsing input completed" >> $REPFILE
-
 #if no prior analysis run, then INPUT is from the command line option
 #	if a prior analysis has been run, then INPUT was set by that parameter below
 PRIORANALYSIS=0
-
+mkdir -p $OUTDIR/output
 # for each program selected:
 #	check all params are defined,
 #	run the function,
 #	check the expected output exists,
 #	set the input for a possible next step
 if [[ $CONSENSUS == "TRUE" ]]; then
+	parseInput
 	INPUT="$OUTDIR/input/$FILEROOT.lin.fa"
 	mkdir -p $OUTDIR/01-consensus
 	#run consensus
@@ -702,14 +897,15 @@ if [[ $CONSENSUS == "TRUE" ]]; then
 	INPUT="$OUTDIR/output/$FILEROOT.01.consensus2.fa"
 fi
 if [[ $EVIGENE == "TRUE" ]]; then
+	parseInput
 	if [[ $PRIORANALYSIS == 0 ]]; then
 		INPUT="$OUTDIR/input/$FILEROOT.lin.fa"
 	fi
 	mkdir -p $OUTDIR/02-evigene
+	cp $INPUT $OUTDIR/02-evigene
 	cd $OUTDIR/02-evigene
-	cp $INPUT ./
 	#run evigene & antifam
-	evidencingm
+	evidencing
 	#cd back to original working directory
 	cd $WD
 	PRIORANALYSIS=1
@@ -718,6 +914,7 @@ if [[ $EVIGENE == "TRUE" ]]; then
 	INPUT="$OUTDIR/output/$FAFILE.02b.evi4full.AF.tr.fa"
 fi
 if [[ $TPM == "TRUE" ]]; then
+	parseInput
 	if [[ $PRIORANALYSIS == 0 ]]; then
 		INPUT="$OUTDIR/input/$FILEROOT.lin.fa"
 	fi
@@ -728,6 +925,11 @@ if [[ $TPM == "TRUE" ]]; then
 	INPUT="$OUTDIR/output/$FAFILE.03.tpm0.fa"
 fi
 if [[ $TRANSFUSE == "TRUE" ]]; then
+	parseInput
+	#check that the read files exist
+	checkReads
+	echo -e "\tread files found"
+	echo -e "\tread files found" >> $REPFILE
 	#use whatever INPUT is, either set above if not the first step or original input as a possible list of fastas
 	mkdir -p $OUTDIR/04-transfuse
 	cd $OUTDIR/04-transfuse
@@ -736,22 +938,34 @@ if [[ $TRANSFUSE == "TRUE" ]]; then
 	cd $WD
 
 	#check that Transfuse output is present
-	if [[ -f "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF.fa" ]]; then
-		cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF.fa $OUTDIR/output/$FILEROOT.04c.TF3.fa
-		cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
-		cp "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT""_filtered.fa" $OUTDIR/output/$FILEROOT.04a.TF1.fa
+	if ls $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF.fa 1> /dev/null 2>&1 || ls $OUTDIR/04-transfuse/$FILEROOT.TF.fa 1> /dev/null 2>&1; then
+		if ls $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF.fa 1> /dev/null 2>&1; then
+			cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF.fa $OUTDIR/output/$FILEROOT.04c.TF3.fa
+			cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
+			cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT*_filtered.fa $OUTDIR/output/$FILEROOT.04a.TF1.fa
+		else
+			cp $OUTDIR/04-transfuse/$FILEROOT.TF.fa $OUTDIR/output/$FILEROOT.04c.TF3.fa
+			cp $OUTDIR/04-transfuse/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
+			cp $OUTDIR/04-transfuse/$FILEROOT*_filtered.fa $OUTDIR/output/$FILEROOT.04a.TF1.fa
+		fi
 		INPUT="$OUTDIR/output/$FILEROOT.04c.TF3.fa"
 		#all 3 output files found
 		echo -e "Output written for all 3 stages of Transfuse"
 		echo -e "Output written for all 3 stages of Transfuse" >> $REPFILE
-	elif [[ -f "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa" ]]; then
-		cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
-		cp "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT""_filtered.fa" $OUTDIR/output/$FILEROOT.04a.TF1.fa
+	elif ls $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa 1> /dev/null 2>&1 || ls $OUTDIR/04-transfuse/$FILEROOT.TF_cons.fa 1> /dev/null 2>&1; then
+		if ls $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa 1> /dev/null 2>&1; then
+			cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
+			cp $OUTDIR/04-transfuse/Transfuse/*/$FILEROOT.*_filtered.fa $OUTDIR/output/$FILEROOT.04a.TF1.fa
+		else
+			cp $OUTDIR/04-transfuse/$FILEROOT.TF_cons.fa $OUTDIR/output/$FILEROOT.04b.TF2.fa
+			cp $OUTDIR/04-transfuse/$FILEROOT.*_filtered.fa $OUTDIR/output/$FILEROOT.04a.TF1.fa
+		fi
 		INPUT="$OUTDIR/output/$FILEROOT.04b.TF2.fa"
 		#TF3 failed
 		echo -e "Transfuse final Transrate failed, using vsearch output as INPUT if subsequent Mariner steps requested\nThis may be appropriate to do if a single file was used as input to Transfuse; if multiple files were used as input then consider filtering transcripts with tpm=0 or using evigene prior to running Transfuse. Running Transfuse implementation of Transrate without Salmon error models may also resolve the problem."
 		echo -e "Transfuse final Transrate failed, using vsearch output as INPUT if subsequent Mariner steps requested\nThis may be appropriate to do if a single file was used as input to Transfuse; if multiple files were used as input then consider filtering transcripts with tpm=0 or using evigene prior to running Transfuse. Running Transfuse implementation of Transrate without Salmon error models may also resolve the problem." >> $REPFILE
-	elif [[ -f "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT""_filtered.fa" ]]; then
+	elif ls "$OUTDIR/04-transfuse/Transfuse/*/$FILEROOT""_filtered.fa" 1> /dev/null 2>&1 || ls "$OUTDIR/04-transfuse/Transfuse/$FILEROOT""_filtered.fa" 1> /dev/null 2>&1; then
+		#TF2 failed
 		echo -e "Transfuse vsearch failed, check that the initial Transrate filtering stage of Transfuse completed correctly."
 		echo -e "Transfuse vsearch failed, check that the initial Transrate filtering stage of Transfuse completed correctly." >> $REPFILE
 		kill -INT $$
@@ -763,9 +977,15 @@ if [[ $TRANSFUSE == "TRUE" ]]; then
 	fi
 fi
 if [[ $DETONATE == "TRUE" ]]; then
+	parseInput
 	if [[ $PRIORANALYSIS == 0 ]]; then
 		INPUT="$OUTDIR/input/$FILEROOT.lin.fa"
 	fi
+	#check that the read files exist
+	checkReads
+	echo -e "\tread files found"
+	echo -e "\tread files found" >> $REPFILE
+
 	mkdir -p $OUTDIR/05-detonate
 	detonating
 	PRIORANALYSIS=1
@@ -773,9 +993,15 @@ if [[ $DETONATE == "TRUE" ]]; then
 	INPUT="$OUTDIR/output/$FILEROOT.05.Detonate.fa"
 fi
 if [[ $CORSET == "TRUE" ]]; then
+	parseInput
 	if [[ $PRIORANALYSIS == 0 ]]; then
 		INPUT="$OUTDIR/input/$FILEROOT.lin.fa"
 	fi
+	#check that the read files exist
+	checkReads
+	echo -e "\tread files found"
+	echo -e "\tread files found" >> $REPFILE
+
 	mkdir -p $OUTDIR/06-corset
 	corseting
 	PRIORANALYSIS=1
@@ -784,9 +1010,8 @@ fi
 if [[ $SUMMARY == "TRUE" ]]; then
 	mkdir -p $OUTDIR/fasta-summaries
 	if [[ $PRIORANALYSIS == 1 ]]; then
-		SUMMARYDIR="$OUTDIR/output/*fa"
+		SUMMARYDIR="$OUTDIR/output"
 	else
-
 		SUMMARYDIR="$INPUT"
 	fi
 	#run summaries and write to output file and to csv
